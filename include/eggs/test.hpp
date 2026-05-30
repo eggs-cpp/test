@@ -137,8 +137,19 @@ inline int run(run_options opts = {})
             std::ranges::sort(selected_cases, {}, &detail::test_entry::name);
         }
         if (*opts.seed != 0) {
+            // Fisher-Yates shuffle with rejection sampling;
+            // portable across all platforms
             std::mt19937 rng(*opts.seed);
-            std::shuffle(selected_cases.begin(), selected_cases.end(), rng);
+            for (std::size_t i = selected_cases.size(); i > 1; --i) {
+                std::uint32_t const n = static_cast<std::uint32_t>(i);
+                std::uint32_t const threshold =
+                    static_cast<std::uint32_t>(-n) % n;
+                std::uint32_t r;
+                do {
+                    r = rng();
+                } while (r < threshold);
+                std::swap(selected_cases[i - 1], selected_cases[r % n]);
+            }
         }
     }
 
