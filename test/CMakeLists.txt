@@ -282,3 +282,189 @@ add_lib_test(
     FAIL_REGEX "\\[ RUN  \\]"
     WILL_FAIL
 )
+
+# Randomized order: all passing cases must still pass.
+add_test(
+    NAME eggs.test.randomize.pass
+    COMMAND _eggs_test.check.pass --randomize=0
+)
+set_tests_properties(
+    eggs.test.randomize.pass
+    PROPERTIES FOLDER "test" LABELS "unit"
+)
+
+# Randomized order: failure is detected regardless of execution order.
+add_test(
+    NAME eggs.test.randomize.fail
+    COMMAND _eggs_test.check.fail --randomize=0
+)
+set_tests_properties(
+    eggs.test.randomize.fail
+    PROPERTIES
+        FOLDER "test"
+        LABELS "unit"
+        PASS_REGULAR_EXPRESSION "FAILED: 1 \\+ 2 == 4"
+)
+
+# --- cli --randomize tests ---------------------------------------------------
+
+# --randomize (no =) generates a random seed and prints it to stderr.
+add_lib_test(
+    cli.randomize.seed_printed.pass
+    SOURCES check.pass.cpp
+    ARGS "--randomize"
+    PASS_REGEX "Randomized with seed: [0-9]+"
+)
+
+# --randomize=42 prints the exact given seed.
+add_lib_test(
+    cli.randomize.explicit_seed.pass
+    SOURCES check.pass.cpp
+    ARGS "--randomize=42"
+    PASS_REGEX "Randomized with seed: 42"
+)
+
+# seed=0 is valid (uint32 min boundary).
+add_lib_test(
+    cli.randomize.seed_zero.pass
+    SOURCES check.pass.cpp
+    ARGS "--randomize=0"
+    PASS_REGEX "Randomized with seed: 0"
+)
+
+# seed=4294967295 is valid (uint32 max boundary).
+add_lib_test(
+    cli.randomize.seed_max.pass
+    SOURCES check.pass.cpp
+    ARGS "--randomize=4294967295"
+    PASS_REGEX "Randomized with seed: 4294967295"
+)
+
+# --randomize= (empty after =) must be rejected.
+add_lib_test(
+    cli.randomize.invalid_empty.fail
+    SOURCES check.pass.cpp
+    ARGS "--randomize="
+    PASS_REGEX "error: invalid seed ''"
+    WILL_FAIL
+)
+
+# --randomize=-1 (negative) must be rejected; from_chars rejects leading '-'
+# for unsigned parsing.
+add_lib_test(
+    cli.randomize.invalid_negative.fail
+    SOURCES check.pass.cpp
+    ARGS "--randomize=-1"
+    PASS_REGEX "error: invalid seed '-1'"
+    WILL_FAIL
+)
+
+# --randomize=abc (non-numeric) must be rejected.
+add_lib_test(
+    cli.randomize.invalid_alpha.fail
+    SOURCES check.pass.cpp
+    ARGS "--randomize=abc"
+    PASS_REGEX "error: invalid seed 'abc'"
+    WILL_FAIL
+)
+
+# --randomize=4294967296 (> uint32 max) must be rejected via
+# std::errc::result_out_of_range.
+add_lib_test(
+    cli.randomize.invalid_overflow.fail
+    SOURCES check.pass.cpp
+    ARGS "--randomize=4294967296"
+    PASS_REGEX "error: invalid seed '4294967296'"
+    WILL_FAIL
+)
+
+# --randomize=1.5 (decimal) must be rejected via the partial-parse guard
+# (ptr != end after from_chars stops at '.').
+add_lib_test(
+    cli.randomize.invalid_decimal.fail
+    SOURCES check.pass.cpp
+    ARGS "--randomize=1.5"
+    PASS_REGEX "error: invalid seed '1.5'"
+    WILL_FAIL
+)
+
+# --list --randomize=42 prints the seed even in list mode.
+add_lib_test(
+    cli.list.randomize.seed_printed.pass
+    SOURCES registration.cpp
+    ARGS "--list" "--randomize=42"
+    PASS_REGEX "Randomized with seed: 42"
+)
+
+# --list --randomize=<seed> (no --run) lists ALL cases sorted then shuffled.
+# Sorted input: registration_one, registration_three, registration_two.
+# With seed=0 the shuffle produces: one, two, three.
+string(
+    CONCAT _list_randomize_all_regex
+    "registration_one\n"
+    "registration_three\n"
+    "registration_two"
+)
+add_lib_test(
+    cli.list.randomize.pass
+    SOURCES registration.cpp
+    ARGS "--list" "--randomize=0"
+    PASS_REGEX "${_list_randomize_all_regex}"
+)
+
+# --list --randomize=<seed> --run=... lists selected cases in shuffled order.
+# --run order [one, two, three] shuffled with seed=0 produces: one, three, two.
+string(
+    CONCAT _list_randomize_run_regex
+    "registration_one\n"
+    "registration_three\n"
+    "registration_two"
+)
+add_lib_test(
+    cli.list.randomize.run.order.pass
+    SOURCES registration.cpp
+    ARGS
+        "--list"
+        "--randomize=0"
+        "--run=registration_one"
+        "--run=registration_two"
+        "--run=registration_three"
+    PASS_REGEX "${_list_randomize_run_regex}"
+    FAIL_REGEX "registration_one\nregistration_two\nregistration_three"
+)
+
+# --randomize=<seed> (no --run) runs all cases in the same shuffled order as
+# --list predicted.  seed=0: one, two, three.
+string(
+    CONCAT _run_randomize_all_regex
+    "\\[ RUN  \\] registration_one[^\n]*(\n[^\n]+)+\n"
+    "\\[ RUN  \\] registration_three[^\n]*(\n[^\n]+)+\n"
+    "\\[ RUN  \\] registration_two"
+)
+add_lib_test(
+    cli.run.randomize.pass
+    SOURCES registration.cpp
+    ARGS "--randomize=0"
+    PASS_REGEX "${_run_randomize_all_regex}"
+)
+
+# --randomize=<seed> --run=... runs in the shuffled order.
+# seed=0: one, three, two — differs from the given --run order one, two, three.
+string(
+    CONCAT _run_randomize_order_regex
+    "\\[ RUN  \\] registration_one[^\n]*(\n[^\n]+)+\n"
+    "\\[ RUN  \\] registration_three[^\n]*(\n[^\n]+)+\n"
+    "\\[ RUN  \\] registration_two"
+)
+add_lib_test(
+    cli.run.randomize.order.pass
+    SOURCES registration.cpp
+    ARGS
+        "--randomize=0"
+        "--run=registration_one"
+        "--run=registration_two"
+        "--run=registration_three"
+    PASS_REGEX "${_run_randomize_order_regex}"
+    FAIL_REGEX
+        "\\[ RUN  \\] registration_one[^\n]*\n[^\n]*\n\\[ RUN  \\] registration_two"
+)

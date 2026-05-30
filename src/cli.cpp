@@ -11,6 +11,8 @@
 
 #include <cstdio>
 #include <format>
+#include <optional>
+#include <random>
 #include <span>
 #include <string>
 #include <string_view>
@@ -54,6 +56,19 @@ constexpr opt_spec k_opts[] = {
      EGGS_TEST_MAKE_STRING_VIEW_SPAN(
          "run only the specified test cases (repeatable).",
          "all test cases will run if omitted"
+     )},
+
+    {"--randomize",
+     "",
+     {},
+     EGGS_TEST_MAKE_STRING_VIEW_SPAN(
+         "shuffle the run list using a random seed"
+     )},
+    {"--randomize",
+     "<seed>",
+     {},
+     EGGS_TEST_MAKE_STRING_VIEW_SPAN(
+         "shuffle the run list using the given seed"
      )},
 };
 
@@ -124,6 +139,25 @@ parse_result parse_args(int argc, char const* const argv[])
             return pr;
         } else if (arg == "--list") {
             pr.opts.list = true;
+        } else if (arg == "--randomize") {
+            pr.opts.seed = static_cast<std::uint32_t>(std::random_device{}());
+        } else if (arg.starts_with("--randomize=")) {
+            auto value = arg.substr(12);
+            std::uint32_t seed = 0;
+            auto [ptr, ec] = std::from_chars(
+                value.data(), value.data() + value.size(), seed
+            );
+            if (ec != std::errc{} || ptr != value.data() + value.size()) {
+                std::fprintf(
+                    stderr, "error: invalid seed '%.*s'\n",
+                    static_cast<int>(value.size()), value.data()
+                );
+
+                pr.action = parse_action::exit_failure;
+                return pr;
+            } else {
+                pr.opts.seed = seed;
+            }
         } else if (arg.starts_with("--run=")) {
             auto const name = arg.substr(6);
 
@@ -134,6 +168,13 @@ parse_result parse_args(int argc, char const* const argv[])
             pr.action = parse_action::exit_failure;
             return pr;
         }
+    }
+
+    if (pr.opts.seed.has_value()) {
+        std::fprintf(
+            stderr, "Randomized with seed: %u\n",
+            static_cast<unsigned>(*pr.opts.seed)
+        );
     }
 
     return pr;

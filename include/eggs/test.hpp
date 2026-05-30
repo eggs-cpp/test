@@ -13,8 +13,12 @@
 #include <eggs/test/detail/runner.hpp>
 #include <eggs/test/detail/stacktrace.hpp>
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <optional>
+#include <random>
 #include <source_location>
 #include <string_view>
 #include <unordered_set>
@@ -90,6 +94,8 @@ struct run_options
     std::vector<std::string_view> run;
     // list matching test case names instead of running them
     bool list = false;
+    // if set, shuffle the selected cases using this seed
+    std::optional<std::uint32_t> seed;
 };
 
 // Public entry point — call this from main().
@@ -122,6 +128,18 @@ inline int run(run_options opts = {})
 
         // TODO: consider executing known test cases instead of failing
         if (any_unknown) return EXIT_FAILURE;
+    }
+
+    if (opts.seed.has_value()) {
+        if (opts.run.empty() || *opts.seed == 0) {
+            // unordered_set iteration order is non-deterministic;
+            // sort by name so the same seed always produces the same order.
+            std::ranges::sort(selected_cases, {}, &detail::test_entry::name);
+        }
+        if (*opts.seed != 0) {
+            std::mt19937 rng(*opts.seed);
+            std::shuffle(selected_cases.begin(), selected_cases.end(), rng);
+        }
     }
 
     if (opts.list) {
