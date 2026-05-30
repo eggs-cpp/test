@@ -111,20 +111,21 @@ endif()
 # --- failing tests -----------------------------------------------------------
 
 # CHECK with a false expression must cause the test case to be reported as
-# failed, and the stringified expression must appear in the output.
+# failed; the stringified expression and the evaluated expanded values must
+# both appear in the output.
 add_lib_test(
     check.fail
     SOURCES check.fail.cpp
-    PASS_REGEX "FAILED: 1 \\+ 2 == 4"
+    PASS_REGEX "FAILED: 1 \\+ 2 == 4[^\n]*\n[^\n]*expanded: 3 == 4"
     WILL_FAIL
 )
 
 # REQUIRE with a false expression must fail the test case and stop executing
-# the rest of it; the stringified expression must appear in the output.
+# the rest of it; the stringified expression and expanded values must appear.
 add_lib_test(
     require.fail
     SOURCES require.fail.cpp
-    PASS_REGEX "FAILED: 1 \\+ 2 == 4"
+    PASS_REGEX "FAILED: 1 \\+ 2 == 4[^\n]*\n[^\n]*expanded: 3 == 4"
     WILL_FAIL
 )
 
@@ -280,5 +281,92 @@ add_lib_test(
     ARGS "--run=unknown_a" "--run=unknown_b"
     PASS_REGEX "${_run_unknown_multi_regex}"
     FAIL_REGEX "\\[ RUN  \\]"
+    WILL_FAIL
+)
+
+# --- decompose tests ---------------------------------------------------------
+
+# Expression decomposition: lhs op rhs shows evaluated values on failure.
+add_lib_test(decompose.pass SOURCES decompose.pass.cpp)
+add_lib_test(decompose.fail SOURCES decompose.fail.cpp WILL_FAIL)
+
+# Integers: verify the "expanded:" line shows numeric operand values.
+add_lib_test(
+    decompose.int.fail
+    SOURCES decompose.fail.cpp
+    ARGS "--run=decompose_equal_fail"
+    PASS_REGEX "expanded: 42 == 0"
+    WILL_FAIL
+)
+
+# Strings: verify that string values are quoted in the "expanded:" line.
+add_lib_test(
+    decompose.string.fail
+    SOURCES decompose.fail.cpp
+    ARGS "--run=decompose_string_fail"
+    PASS_REGEX "expanded: \"hello\" == \"world\""
+    WILL_FAIL
+)
+
+# Arithmetic: verify that the evaluated value, not the sub-expression text, is
+# shown (lhs of x + 1 == 5 is captured as 3).
+add_lib_test(
+    decompose.arithmetic.fail
+    SOURCES decompose.fail.cpp
+    ARGS "--run=decompose_arithmetic_fail"
+    PASS_REGEX "expanded: 3 == 5"
+    WILL_FAIL
+)
+
+# Non-formattable: when both sides are unformattable the "expanded:" line is
+# suppressed; only the stringified expression from FAILED: is shown.
+add_lib_test(
+    decompose.unformattable.fail
+    SOURCES decompose.fail.cpp
+    ARGS "--run=decompose_unformattable_fail"
+    PASS_REGEX "FAILED: a == b"
+    FAIL_REGEX "expanded:"
+    WILL_FAIL
+)
+
+# REQUIRE: verify that decomposition and the expanded line also work for REQUIRE.
+add_lib_test(
+    decompose.require.fail
+    SOURCES decompose.fail.cpp
+    ARGS "--run=require_decompose_fail"
+    PASS_REGEX "expanded: 42 == 0"
+    WILL_FAIL
+)
+
+# User-defined types: unformattable, formattable, debug-formattable.
+add_lib_test(decompose.udt.pass SOURCES decompose.udt.pass.cpp)
+add_lib_test(decompose.udt.fail SOURCES decompose.udt.fail.cpp WILL_FAIL)
+
+# Unformattable UDT: both sides are "?" → expanded line is suppressed.
+add_lib_test(
+    decompose.udt.unformattable.fail
+    SOURCES decompose.udt.fail.cpp
+    ARGS "--run=udt_unformattable_fail"
+    PASS_REGEX "FAILED: a == b"
+    FAIL_REGEX "expanded:"
+    WILL_FAIL
+)
+
+# Formattable UDT: expanded line shows the {} representation of each operand.
+add_lib_test(
+    decompose.udt.formattable.fail
+    SOURCES decompose.udt.fail.cpp
+    ARGS "--run=udt_formattable_fail"
+    PASS_REGEX "expanded: formattable\\(1\\) == formattable\\(2\\)"
+    WILL_FAIL
+)
+
+# Debug-formattable UDT: expanded line shows the {:?} representation (quoted).
+add_lib_test(
+    decompose.udt.debug_formattable.fail
+    SOURCES decompose.udt.fail.cpp
+    ARGS "--run=udt_debug_formattable_fail"
+    PASS_REGEX
+        "expanded: \"debug_formattable\\(1\\)\" == \"debug_formattable\\(2\\)\""
     WILL_FAIL
 )

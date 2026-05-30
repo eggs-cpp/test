@@ -21,7 +21,10 @@ using stacktrace = std::stacktrace;
 #else
 struct stacktrace
 {
-    static stacktrace current() { return {}; }
+    static stacktrace current([[maybe_unused]] std::size_t skip = 0)
+    {
+        return {};
+    }
 
     std::size_t size() const noexcept { return 0; }
 };

@@ -7,29 +7,39 @@
 
 #pragma once
 
+#include <eggs/test/detail/decompose.hpp>
 #include <eggs/test/detail/print.hpp>
 #include <eggs/test/detail/registry.hpp>
 #include <eggs/test/detail/run_state.hpp>
 #include <eggs/test/detail/stacktrace.hpp>
 
-#include <cstdio>
+#include <cstddef>
 #include <source_location>
 
 namespace eggs::test::detail {
 
-inline void do_check_failed(
-    run_state& s, const char* expr, std::source_location const& loc,
+template <typename Expr>
+inline void print_failure(
+    Expr const& expr, char const* text, std::source_location const& loc,
     detail::stacktrace const& st
 )
 {
-    ++s.assertions_failed;
     detail::println(
-        stdout, "  FAILED: {}  [{}:{}]", expr, loc.file_name(), loc.line()
+        stdout, "  FAILED: {}  [{}:{}]", text, loc.file_name(), loc.line()
     );
 
+    if constexpr (decomposed_expr<Expr>) {
+        using Lhs = decltype(expr.lhs);
+        using Rhs = decltype(expr.rhs);
+        if constexpr (formattable_operand<Lhs> || formattable_operand<Rhs>)
+            detail::println(
+                stdout, "    expanded: {} {} {}", format_operand(expr.lhs),
+                expr.op, format_operand(expr.rhs)
+            );
+    }
+
 #ifdef __cpp_lib_stacktrace
-    // Directly in test body:  st.size() == s.entry_depth + 1
-    // Inside a helper:        st.size() >  s.entry_depth + 1
+    auto const& s = run_state::current();
     if (st.size() > s.entry_depth + 1) {
         detail::println(stdout, "  Stacktrace (innermost first):");
         std::size_t const user_frames = st.size() - s.entry_depth - 1;
@@ -41,12 +51,34 @@ inline void do_check_failed(
 #endif
 }
 
-inline void do_require_failed(
-    run_state& s, const char* expr, std::source_location const& loc,
-    detail::stacktrace const& st
+template <typename Expr>
+inline void do_check(
+    Expr&& expr, char const* text,
+    std::source_location loc = std::source_location::current()
 )
 {
-    do_check_failed(s, expr, loc, std::move(st));
+    auto& s = run_state::current();
+    if (static_cast<bool>(expr)) {
+        ++s.assertions_passed;
+        return;
+    }
+    ++s.assertions_failed;
+    print_failure(expr, text, loc, detail::stacktrace::current(1));
+}
+
+template <typename Expr>
+inline void do_require(
+    Expr&& expr, char const* text,
+    std::source_location loc = std::source_location::current()
+)
+{
+    auto& s = run_state::current();
+    if (static_cast<bool>(expr)) {
+        ++s.assertions_passed;
+        return;
+    }
+    ++s.assertions_failed;
+    print_failure(expr, text, loc, detail::stacktrace::current(1));
     throw require_failed{};
 }
 

@@ -40,6 +40,7 @@ target_sources(
             BASE_DIRS include
             FILES
                 include/eggs/test.hpp
+                include/eggs/test/detail/decompose.hpp
                 include/eggs/test/detail/registry.hpp
                 include/eggs/test/detail/checks.hpp
                 include/eggs/test/detail/print.hpp

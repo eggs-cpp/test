@@ -8,6 +8,7 @@
 #pragma once
 
 #include <eggs/test/detail/checks.hpp>
+#include <eggs/test/detail/decompose.hpp>
 #include <eggs/test/detail/registry.hpp>
 #include <eggs/test/detail/run_state.hpp>
 #include <eggs/test/detail/runner.hpp>
@@ -52,34 +53,20 @@
 //
 // Uses #__VA_ARGS__ so that expressions containing commas (e.g. template
 // arguments) stringify correctly.
-#define CHECK(...)                                                          \
-    do {                                                                    \
-        if (static_cast<bool>(__VA_ARGS__))                                 \
-            ++::eggs::test::detail::run_state::current().assertions_passed; \
-        else                                                                \
-            ::eggs::test::detail::do_check_failed(                          \
-                ::eggs::test::detail::run_state::current(), #__VA_ARGS__,   \
-                ::std::source_location::current(),                          \
-                ::eggs::test::detail::stacktrace::current()                 \
-            );                                                              \
-    } while (false)
+#define CHECK(...)                                                      \
+    ::eggs::test::detail::do_check(                                     \
+        ::eggs::test::detail::Decomposer{} <= __VA_ARGS__, #__VA_ARGS__ \
+    )
 
 // REQUIRE(expr)
 //
 // Identical to CHECK but also throws eggs::test::detail::require_failed on
 // failure, which is caught by the runner to stop execution of the current test
 // case while allowing subsequent cases to continue.
-#define REQUIRE(...)                                                        \
-    do {                                                                    \
-        if (static_cast<bool>(__VA_ARGS__))                                 \
-            ++::eggs::test::detail::run_state::current().assertions_passed; \
-        else                                                                \
-            ::eggs::test::detail::do_require_failed(                        \
-                ::eggs::test::detail::run_state::current(), #__VA_ARGS__,   \
-                ::std::source_location::current(),                          \
-                ::eggs::test::detail::stacktrace::current()                 \
-            );                                                              \
-    } while (false)
+#define REQUIRE(...)                                                    \
+    ::eggs::test::detail::do_require(                                   \
+        ::eggs::test::detail::Decomposer{} <= __VA_ARGS__, #__VA_ARGS__ \
+    )
 
 namespace eggs::test {
 
