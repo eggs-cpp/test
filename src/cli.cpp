@@ -9,13 +9,17 @@
 
 #include <eggs/test/detail/print.hpp>
 
+#include <cerrno>
+#include <charconv>
 #include <cstdio>
+#include <cstdlib>
 #include <format>
 #include <optional>
 #include <random>
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 namespace eggs::test {
 namespace {
@@ -120,6 +124,29 @@ void print_help()
     }
 }
 
+std::optional<std::uint32_t> parse_seed(std::string_view value)
+{
+#ifdef __cpp_lib_to_chars
+    std::uint32_t seed = 0;
+    auto const [ptr, ec] =
+        std::from_chars(value.data(), value.data() + value.size(), seed);
+    if (ec != std::errc{} || ptr != value.data() + value.size())
+        return std::nullopt;
+    return seed;
+#else
+    // value.data() is null-terminated (argv entry).
+    // isdigit guard rejects leading '+'/'-'/whitespace that strtoul accepts.
+    if (value.empty() || !std::isdigit(static_cast<unsigned char>(value[0])))
+        return std::nullopt;
+    char* end = nullptr;
+    errno = 0;
+    unsigned long const ul = std::strtoul(value.data(), &end, 10);
+    if (end != value.data() + value.size() || errno != 0 || ul > 0xFFFF'FFFFul)
+        return std::nullopt;
+    return static_cast<std::uint32_t>(ul);
+#endif
+}
+
 } // namespace
 
 // ── Public interface ─────────────────────────────────────────────────────────
@@ -142,12 +169,10 @@ parse_result parse_args(int argc, char const* const argv[])
         } else if (arg == "--randomize") {
             pr.opts.seed = static_cast<std::uint32_t>(std::random_device{}());
         } else if (arg.starts_with("--randomize=")) {
-            auto value = arg.substr(12);
-            std::uint32_t seed = 0;
-            auto [ptr, ec] = std::from_chars(
-                value.data(), value.data() + value.size(), seed
-            );
-            if (ec != std::errc{} || ptr != value.data() + value.size()) {
+            auto const value = arg.substr(12);
+
+            pr.opts.seed = parse_seed(value);
+            if (!pr.opts.seed.has_value()) {
                 std::fprintf(
                     stderr, "error: invalid seed '%.*s'\n",
                     static_cast<int>(value.size()), value.data()
@@ -155,8 +180,6 @@ parse_result parse_args(int argc, char const* const argv[])
 
                 pr.action = parse_action::exit_failure;
                 return pr;
-            } else {
-                pr.opts.seed = seed;
             }
         } else if (arg.starts_with("--run=")) {
             auto const name = arg.substr(6);
