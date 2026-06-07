@@ -38,5 +38,8 @@ function(add_example name)
 endfunction()
 
 add_example(basic CASES arithmetic string_view containers)
-add_example(exceptions CASES parse_throws parse_throws_as parse_catches_as)
+add_example(
+    exceptions
+    CASES parse_throws parse_throws_as parse_catches_as parse_template_error
+)
 add_example(helpers CASES helper_check helper_require)

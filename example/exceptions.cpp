@@ -21,6 +21,20 @@ int parse_int(std::string_view s)
     return result;
 }
 
+// A template exception whose two type parameters introduce a comma.
+// CHECK_THROWS_AS(parse_error<int, int>, ...) would confuse the preprocessor;
+// wrapping in parentheses — (parse_error<int, int>) - hides the comma.
+template <typename Input, typename Code>
+struct parse_error
+{
+    Code code;
+};
+
+void throw_parse_error()
+{
+    throw parse_error<int, int>{42};
+}
+
 } // namespace
 
 TEST_CASE(parse_throws, "throwing and non-throwing expressions")
@@ -43,5 +57,17 @@ TEST_CASE(parse_catches_as, "inspecting the caught exception")
     CHECK_CATCHES_AS(std::invalid_argument, parse_int("1abc"))
     {
         CHECK(std::string_view(exc.what()) == "trailing characters");
+    }
+}
+
+TEST_CASE(
+    parse_template_error, "parenthesized template exception types with commas"
+)
+{
+    // Wrapping the type in parentheses hides the comma from the preprocessor.
+    CHECK_THROWS_AS((parse_error<int, int>), throw_parse_error());
+    CHECK_CATCHES_AS((parse_error<int, int>), throw_parse_error())
+    {
+        CHECK(exc.code == 42);
     }
 }

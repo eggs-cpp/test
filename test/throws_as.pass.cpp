@@ -15,6 +15,15 @@ struct my_error
 
 struct my_derived_error : my_error
 {};
+
+template <typename T, typename U>
+struct typed_error
+{};
+
+void throw_typed_error()
+{
+    throw typed_error<int, int>{};
+}
 } // namespace
 
 TEST_CASE(check_throws_as_int, "CHECK_THROWS_AS passes for exact type int")
@@ -77,5 +86,31 @@ TEST_CASE(
 )
 {
     REQUIRE_THROWS_AS(my_error, throw my_error{});
+    CHECK(true);
+}
+
+TEST_CASE(
+    check_throws_as_parenthesized,
+    "CHECK_THROWS_AS accepts a parenthesized type argument"
+)
+{
+    CHECK_THROWS_AS((int), throw 42);
+    CHECK_THROWS_AS((std::runtime_error), throw std::runtime_error{"oops"});
+}
+
+TEST_CASE(
+    check_throws_as_template_commas,
+    "CHECK_THROWS_AS handles parenthesized template types with commas"
+)
+{
+    CHECK_THROWS_AS((typed_error<int, int>), throw_typed_error());
+}
+
+TEST_CASE(
+    require_throws_as_template_commas,
+    "REQUIRE_THROWS_AS passes without stopping the test"
+)
+{
+    REQUIRE_THROWS_AS((typed_error<int, int>), throw_typed_error());
     CHECK(true);
 }

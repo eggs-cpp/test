@@ -15,6 +15,18 @@ struct my_error
 {
     int value = 0;
 };
+
+template <typename T, typename U>
+struct typed_error
+{
+    T first;
+    U second;
+};
+
+void throw_typed_error()
+{
+    throw typed_error<int, int>{1, 2};
+}
 } // namespace
 
 TEST_CASE(
@@ -123,5 +135,41 @@ TEST_CASE(
 )
 {
     REQUIRE_CATCHES_AS(std::runtime_error, throw std::runtime_error{"x"}) {}
+    CHECK(true);
+}
+
+TEST_CASE(
+    check_catches_as_parenthesized,
+    "CHECK_CATCHES_AS accepts a parenthesized type argument"
+)
+{
+    CHECK_CATCHES_AS((std::runtime_error), throw std::runtime_error{"oops"})
+    {
+        CHECK(std::string_view(exc.what()) == "oops");
+    }
+}
+
+TEST_CASE(
+    check_catches_as_template_commas,
+    "CHECK_CATCHES_AS handles parenthesized template types with commas"
+)
+{
+    CHECK_CATCHES_AS((typed_error<int, int>), throw_typed_error())
+    {
+        CHECK(exc.first == 1);
+        CHECK(exc.second == 2);
+    }
+}
+
+TEST_CASE(
+    require_catches_as_template_commas,
+    "REQUIRE_CATCHES_AS passes without stopping the test"
+)
+{
+    REQUIRE_CATCHES_AS((typed_error<int, int>), throw_typed_error())
+    {
+        CHECK(exc.first == 1);
+        CHECK(exc.second == 2);
+    }
     CHECK(true);
 }

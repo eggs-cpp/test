@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <exception>
 #include <source_location>
+#include <type_traits>
 
 namespace eggs::test::detail {
 
@@ -55,6 +56,7 @@ EGGS_TEST_NOINLINE inline bool check_throws(
 }
 
 template <typename ExcType, typename Fn>
+    requires std::is_object_v<ExcType>
 EGGS_TEST_NOINLINE inline std::exception_ptr check_throws_as(
     Fn fn, const char* expr, run_state& s, const char* exc_type,
     std::source_location const& loc

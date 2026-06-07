@@ -37,7 +37,7 @@ set_tests_properties(
 function(add_lib_test name)
     cmake_parse_arguments(
         ARG
-        ""
+        "COMPILE_FAIL"
         "EXITS;PASS_REGEX"
         "ARGS;FAIL_REGEX;SOURCES"
         ${ARGN}
@@ -48,6 +48,30 @@ function(add_lib_test name)
         get_filename_component(_stem ${ARG_SOURCES} NAME_WLE)
     else()
         set(_stem ${name})
+    endif()
+
+    if(ARG_COMPILE_FAIL)
+        if(NOT TARGET _eggs_test.${_stem})
+            add_library(
+                _eggs_test.${_stem}
+                OBJECT
+                EXCLUDE_FROM_ALL
+                ${ARG_SOURCES}
+            )
+            target_link_libraries(_eggs_test.${_stem} PRIVATE Eggs::Test)
+            set_target_properties(_eggs_test.${_stem} PROPERTIES FOLDER "test")
+        endif()
+        add_test(
+            NAME eggs.test.${name}
+            COMMAND
+                ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target
+                _eggs_test.${_stem} --config $<CONFIG>
+        )
+        set_tests_properties(
+            eggs.test.${name}
+            PROPERTIES LABELS "unit" WILL_FAIL TRUE RESOURCE_LOCK cmake_build
+        )
+        return()
     endif()
 
     if(NOT TARGET _eggs_test.${_stem})
@@ -444,6 +468,12 @@ add_lib_test(
     FAIL_REGEX "FAILED: false;threw unexpected exception"
     EXITS 1
 )
+# CHECK_THROWS_AS with a reference ExcType requires std::is_object_v<ExcType>.
+add_lib_test(
+    throws_as.reference_type.compile_fail
+    SOURCES throws_as.reference_type.compile_fail.cpp
+    COMPILE_FAIL
+)
 
 # CHECK_CATCHES_AS when nothing is thrown: 'did not throw' appears.
 add_lib_test(
@@ -498,6 +528,12 @@ add_lib_test(
     PASS_REGEX "FAILED: 1 \\+ 1 == 3"
     FAIL_REGEX "FAILED: false"
     EXITS 1
+)
+# CHECK_CATCHES_AS with a reference ExcType requires std::is_object_v<ExcType>.
+add_lib_test(
+    catches_as.reference_type.compile_fail
+    SOURCES catches_as.reference_type.compile_fail.cpp
+    COMPILE_FAIL
 )
 
 # CHECK_NOTHROW when a std exception is thrown: 'threw unexpectedly' with message appears.

@@ -22,6 +22,55 @@
 #include <string_view>
 #include <vector>
 
+namespace eggs::test::detail {
+
+template <typename Fn>
+struct unwrap_type;
+
+template <typename T>
+struct unwrap_type<void(T)>
+{
+    using type = T;
+};
+
+} // namespace eggs::test::detail
+
+// ---------------------------------------------------------------------------
+// Preprocessor helper: strip optional outer parentheses from a type argument.
+//
+//   EGGS_TEST_PP_STRIP_PARENS(T)           ->  T
+//   EGGS_TEST_PP_STRIP_PARENS((T))         ->  T
+//   EGGS_TEST_PP_STRIP_PARENS((T<A, B>))   ->  T<A, B>
+//
+// On GCC/Clang: unwrap_type<void((x))>::type — the extra parens protect
+// comma-containing types from preprocessor splitting; the function-type
+// specialization peels them off at the C++ level.
+//
+// On MSVC: Detection via PROBE_: a function-like macro that only expands when
+// immediately followed by '('.  It is passed as the sole variadic argument to
+// CHECK_; when the probe fires its expansion (~, 1,) becomes __VA_ARGS__ and is
+// then text-substituted into CHECK_N_(__VA_ARGS__, 0,) during rescan, shifting
+// the '1' into position n.  When the probe does not fire, n stays at '0'.
+#if !defined(_MSC_VER) || defined(__clang__) || _MSC_VER >= 1950
+#    define EGGS_TEST_PP_STRIP_PARENS(x) \
+        ::eggs::test::detail::unwrap_type<void((x))>::type
+#else
+#    define EGGS_TEST_PP_PROBE_(...) ~, 1,
+#    define EGGS_TEST_PP_CHECK_N_(x, n, ...) n
+#    define EGGS_TEST_PP_CHECK_(...) EGGS_TEST_PP_CHECK_N_(__VA_ARGS__, 0, )
+#    define EGGS_TEST_PP_HAS_PARENS_(x) \
+        EGGS_TEST_PP_CHECK_(EGGS_TEST_PP_PROBE_ x)
+#    define EGGS_TEST_PP_CAT_(a, b) EGGS_TEST_PP_CAT_I_(a, b)
+#    define EGGS_TEST_PP_CAT_I_(a, b) a##b
+#    define EGGS_TEST_PP_STRIP_I_(...) __VA_ARGS__
+#    define EGGS_TEST_PP_STRIP_PARENS_0(x) x
+#    define EGGS_TEST_PP_STRIP_PARENS_1(x) EGGS_TEST_PP_STRIP_I_ x
+#    define EGGS_TEST_PP_STRIP_PARENS(x)                                            \
+        EGGS_TEST_PP_CAT_(EGGS_TEST_PP_STRIP_PARENS_, EGGS_TEST_PP_HAS_PARENS_(x))( \
+            x                                                                       \
+        )
+#endif
+
 // TEST_CASE(name, "description")
 //
 // Defines a struct named `name` with a static run() member and an inline
@@ -101,10 +150,11 @@
 // type derived from it).  Fails if nothing is thrown or the thrown type does
 // not match.  Returns std::exception_ptr.
 //
-// ExcType is a single argument; template types containing commas require a
-// using-alias.
+// ExcType is a single preprocessor argument; template types containing commas
+// may be wrapped in parentheses: CHECK_THROWS_AS((my_tmpl<A, B>), expr).
 #define CHECK_THROWS_AS(ExcType_, ...)                         \
-    ::eggs::test::detail::check_throws_as<ExcType_>(           \
+    ::eggs::test::detail::check_throws_as<                     \
+        EGGS_TEST_PP_STRIP_PARENS(ExcType_)>(                  \
         [&]() { (void)(__VA_ARGS__); }, #__VA_ARGS__,          \
         ::eggs::test::detail::run_state::current(), #ExcType_, \
         ::std::source_location::current()                      \
@@ -131,15 +181,16 @@
 //       CHECK(std::string_view(exc.what()) == "expected message");
 //   }
 //
-// ExcType is a single argument; template types containing commas require a
-// using-alias.
+// ExcType is a single preprocessor argument; template types containing commas
+// may be wrapped in parentheses: CHECK_CATCHES_AS((my_tmpl<A, B>), expr) {}.
 #define CHECK_CATCHES_AS(ExcType_, ...)                      \
     try {                                                    \
         if (auto e = CHECK_THROWS_AS(ExcType_, __VA_ARGS__)) \
             ::std::rethrow_exception(e);                     \
     } catch (::eggs::test::detail::require_failed const&) {  \
         throw;                                               \
-    } catch ([[maybe_unused]] ExcType_ const& exc)
+    } catch ([[maybe_unused]]                                \
+             EGGS_TEST_PP_STRIP_PARENS(ExcType_) const& exc)
 
 // REQUIRE_CATCHES_AS(ExcType, expr)
 //
@@ -152,7 +203,8 @@
         throw ::eggs::test::detail::require_failed{};        \
     } catch (::eggs::test::detail::require_failed const&) {  \
         throw;                                               \
-    } catch ([[maybe_unused]] ExcType_ const& exc)
+    } catch ([[maybe_unused]]                                \
+             EGGS_TEST_PP_STRIP_PARENS(ExcType_) const& exc)
 
 // CHECK_NOTHROW(expr)
 //
