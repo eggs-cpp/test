@@ -71,8 +71,8 @@
         "CMAKE_CXX_COMPILER": "cl"
       },
       "environment": {
-        "CFLAGS": "/d1trimfile:\"${sourceDir}\"",
-        "CXXFLAGS": "/d1trimfile:\"${sourceDir}\""
+        "CFLAGS": "/Zc:preprocessor /d1trimfile:\"${sourceDir}\"",
+        "CXXFLAGS": "/Zc:preprocessor /d1trimfile:\"${sourceDir}\""
       }
     },
     {

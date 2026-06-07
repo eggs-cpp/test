@@ -7,6 +7,12 @@
 
 #pragma once
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#    if defined(_MSVC_TRADITIONAL) && _MSVC_TRADITIONAL
+#        error "MSVC preprocessor conformance mode required: /Zc:preprocessor"
+#    endif
+#endif
+
 #include <eggs/test/detail/checks.hpp>
 #include <eggs/test/detail/registry.hpp>
 #include <eggs/test/detail/run_state.hpp>
