@@ -38,8 +38,10 @@ function(add_example name)
 endfunction()
 
 add_example(basic CASES arithmetic string_view containers)
-add_example(
-    exceptions
-    CASES parse_throws parse_throws_as parse_catches_as parse_template_error
-)
+set(_exceptions_cases parse_throws parse_throws_as parse_catches_as)
+if(NOT MSVC OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.50")
+    list(APPEND _exceptions_cases parse_template_error)
+endif()
+add_example(exceptions CASES ${_exceptions_cases})
+unset(_exceptions_cases)
 add_example(helpers CASES helper_check helper_require)

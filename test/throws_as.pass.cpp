@@ -89,6 +89,7 @@ TEST_CASE(
     CHECK(true);
 }
 
+#if !defined(_MSC_VER) || defined(__clang__) || _MSC_VER >= 1950
 TEST_CASE(
     check_throws_as_parenthesized,
     "CHECK_THROWS_AS accepts a parenthesized type argument"
@@ -114,3 +115,4 @@ TEST_CASE(
     REQUIRE_THROWS_AS((typed_error<int, int>), throw_typed_error());
     CHECK(true);
 }
+#endif

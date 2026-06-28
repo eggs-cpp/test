@@ -138,6 +138,7 @@ TEST_CASE(
     CHECK(true);
 }
 
+#if !defined(_MSC_VER) || defined(__clang__) || _MSC_VER >= 1950
 TEST_CASE(
     check_catches_as_parenthesized,
     "CHECK_CATCHES_AS accepts a parenthesized type argument"
@@ -173,3 +174,4 @@ TEST_CASE(
     }
     CHECK(true);
 }
+#endif

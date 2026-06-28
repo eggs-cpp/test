@@ -60,6 +60,7 @@ TEST_CASE(parse_catches_as, "inspecting the caught exception")
     }
 }
 
+#if !defined(_MSC_VER) || defined(__clang__) || _MSC_VER >= 1950
 TEST_CASE(
     parse_template_error, "parenthesized template exception types with commas"
 )
@@ -71,3 +72,4 @@ TEST_CASE(
         CHECK(exc.code == 42);
     }
 }
+#endif
