@@ -444,6 +444,13 @@ add_lib_test(
     FAIL_REGEX "\\| .*failed"
 )
 
+# The test-cases summary handles a registry with no test cases at all.
+add_lib_test(
+    summary.no_cases.pass
+    SOURCES summary.no_cases.cpp
+    PASS_REGEX "0 test cases: 0 passed \\(100%\\)"
+)
+
 # The assertions summary reports percentages and failed count.
 add_lib_test(
     summary.per_case.mixed.fail
